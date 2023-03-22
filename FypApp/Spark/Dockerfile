@@ -1,58 +1,45 @@
-FROM java:openjdk-8u111-alpine
+FROM ubuntu:20.04
 
-# PYTHON 3
+#update ubuntu's packages
+RUN apt update
+RUN apt -y upgrade
 
-ENV PYTHON_VERSION 3.4.3-r2
-ENV ALPINE_OLD_VERSION 3.2
-# Hack: using older alpine version to install specific python version
-RUN sed -n \
-    's|^http://dl-cdn\.alpinelinux.org/alpine/v\([0-9]\+\.[0-9]\+\)/main$|\1|p' \
-    /etc/apk/repositories > curr_version.tmp && \
-    sed -i 's|'$(cat curr_version.tmp)'/main|'$ALPINE_OLD_VERSION'/main|' \
-    /etc/apk/repositories
-# Installing given python3 version
-RUN apk update && \
-    apk add python3=$PYTHON_VERSION
-# Reverting hack
-RUN sed -i 's|'$(cat curr_version.tmp)'/main|'$ALPINE_OLD_VERSION'/main|' \
-    /etc/apk/repositories && \
-    rm curr_version.tmp
-# Upgrading pip to the last compatible version
-RUN pip3 install --upgrade pip
+#install wget
+RUN apt-get update && \
+    apt-get install -y --no-install-recommends wget
 
+#install python and its libraries
+RUN apt install -y python3-pip
+RUN pip install pandas && pip install numpy
+RUN pip install requests
+RUN pip install Pillow
+RUN pip install plotly
+RUN pip install streamlit
 
-# GENERAL DEPENDENCIES
+RUN apt update
+RUN apt -y upgrade
 
-RUN apk update && \
-    apk add curl && \
-    apk add bash
+#install java
+RUN DEBIAN_FRONTEND=noninteractive apt-get install -y --no-install-recommends openjdk-11-jre
+RUN DEBIAN_FRONTEND=noninteractive apt-get install -y --no-install-recommends openjdk-11-jdk
 
-# HADOOP
+#install spark
+RUN wget https://downloads.apache.org/spark/spark-3.2.3/spark-3.2.3-bin-hadoop2.7.tgz
+RUN tar -xvzf spark-3.2.3-bin-hadoop2.7.tgz 
+RUN mv spark-3.2.3-bin-hadoop2.7 /usr/local/spark 
+RUN rm -rf spark-3.2.3-bin-hadoop2.7.tgz
 
-ENV HADOOP_VERSION 2.7.2
-ENV HADOOP_HOME /usr/hadoop-$HADOOP_VERSION
-ENV HADOOP_CONF_DIR=$HADOOP_HOME/etc/hadoop
-ENV PATH $PATH:$HADOOP_HOME/bin
-RUN curl -sL --retry 3 \
-    "http://archive.apache.org/dist/hadoop/common/hadoop-$HADOOP_VERSION/hadoop-$HADOOP_VERSION.tar.gz" \
-    | gunzip \
-    | tar -x -C /usr/ && \
-    rm -rf $HADOOP_HOME/share/doc
+#set spark and python environment
+ENV SPARK_HOME=/usr/local/spark
+ENV PATH=$PATH:$SPARK_HOME/bin
 
-# SPARK
+ENV PYSPARK_PYTHON=/usr/bin/python3.8
+ENV PYSPARK_DRIVER_PYTHON=/usr/bin/python3.8
 
-ENV SPARK_VERSION 2.0.0
-ENV SPARK_PACKAGE spark-$SPARK_VERSION-bin-hadoop2.7
-ENV SPARK_HOME /usr/spark-$SPARK_VERSION
-ENV PYSPARK_PYTHON python3 
-ENV SPARK_DIST_CLASSPATH="$HADOOP_HOME/etc/hadoop/*:$HADOOP_HOME/share/hadoop/common/lib/*:$HADOOP_HOME/share/hadoop/common/*:$HADOOP_HOME/share/hadoop/hdfs/*:$HADOOP_HOME/share/hadoop/hdfs/lib/*:$HADOOP_HOME/share/hadoop/hdfs/*:$HADOOP_HOME/share/hadoop/yarn/lib/*:$HADOOP_HOME/share/hadoop/yarn/*:$HADOOP_HOME/share/hadoop/mapreduce/lib/*:$HADOOP_HOME/share/hadoop/mapreduce/*:$HADOOP_HOME/share/hadoop/tools/lib/*"
-ENV PATH $PATH:$SPARK_HOME/bin
-RUN curl -sL --retry 3 \
-    "https://archive.apache.org/dist/spark/spark-2.0.0/spark-2.0.0-bin-hadoop2.7.tgz" \
-    | gunzip \
-    | tar x -C /usr/ && \
-    mv /usr/$SPARK_PACKAGE $SPARK_HOME && \
-    rm -rf $SPARK_HOME/examples $SPARK_HOME/ec2
+#install pyspark
+RUN pip3 install pyspark
 
-WORKDIR /$SPARK_HOME
-CMD ["bin/spark-class", "org.apache.spark.deploy.master.Master"]
+COPY process.py ./
+COPY main.py ./
+COPY app.py ./
+#docker run -it --name ubuntest ubunspark /bin/bash

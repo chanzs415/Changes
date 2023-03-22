@@ -56,11 +56,19 @@ services:
       - ./Hadoop/hadoop.env
  
   pythonapp:
+    container_name: datacontainer
     build: ./DataStorage
-    command: python3 ./main.py
+    volumes:
+      - hadoop_namenode:/hadoop/dfs/name
+    command: tail -f /dev/null
+      - python main.py
 
   spark:
+    container_name: sparkcontainer
     build: ./spark
+    volumes:
+      - hadoop_namenode:/hadoop/dfs/name
+    command: tail -f /dev/null
 
 volumes:
   hadoop_namenode:
