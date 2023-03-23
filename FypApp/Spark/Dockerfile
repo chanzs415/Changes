@@ -12,9 +12,6 @@ RUN apt-get update && \
 RUN apt install -y python3-pip
 RUN pip install pandas && pip install numpy
 RUN pip install requests
-RUN pip install Pillow
-RUN pip install plotly
-RUN pip install streamlit
 
 RUN apt update
 RUN apt -y upgrade
@@ -41,5 +38,4 @@ RUN pip3 install pyspark
 
 COPY process.py ./
 COPY main.py ./
-COPY app.py ./
 #docker run -it --name ubuntest ubunspark /bin/bash
