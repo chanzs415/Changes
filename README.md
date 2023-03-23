@@ -48,3 +48,31 @@ PS : Use docker ps to check container ID
 
 PS: to leave from Scala cmd use Ctrl-D
 PS: to leave from bash cmd use Ctrl-Z
+
+
+**UPDATED
+
+3 BAT files, startup.bat, startup2.bat, shutdown.bat
+
+1) startup.bat
+- Run this code in your terminal
+    - (your directory)/startup.bat
+* This bat files runs the processes of 
+    - Compose file
+    - Data ingestion
+    - Transferring of files from storage container to hdfs to spark container through volume
+    - Processes the data through spark container, outputs a cleaned csv
+    - Transfer clean csv to volume
+    - Start and run the visualization app container
+
+2) startup2.bat
+- Run this code in a separate terminal from startup.bat, as previous terminal is running streamlit
+    - (your directory)/startup.bat
+* This bat file runs the processes of
+    - Transferring output file from volume to visualapp container
+
+3) Open localhost:8501 for streamlit
+4) shutdown.bat
+- Run this code in the first terminal
+    - (your directory)/shutdown.bat
+* This bat file runs docker-compose down to clear the containers and cleans up docker.
