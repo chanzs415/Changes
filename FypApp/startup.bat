@@ -25,7 +25,7 @@ docker exec -it namenode hdfs dfs -put /tmp/data/ /data
 
 ::Run script that processes the data (data will be in /usr/local/output)
 echo "Now cleaning processing weather data..."
-docker exec -it sparkcontainer spark-submit data-cleaning.py
+docker exec -it sparkcontainer spark-submit process.py
 echo "Processing done. Stored in /usr/local/output"
 
 ::Store processed csv in hadoop_namenode
