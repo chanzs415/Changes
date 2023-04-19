@@ -76,3 +76,14 @@ PS: to leave from bash cmd use Ctrl-Z
 - Run this code in the first terminal
     - (your directory)/shutdown.bat
 * This bat file runs docker-compose down to clear the containers and cleans up docker.
+
+**GUI
+1) main.py cannot run, mainV2.py can run, but format is different from process.py, so process.py need to change
+2) find the function "def getHist(self)" and change the directory of the command to your own spark command. Using old csv first to test because of 1) do the same for the docker-compose files 'def startpage()', 'def closeEvent()', 'def stopCommand()'. Have to do these for prototype first.
+3) Make sure your host machine has python and pyqt5 installed.
+    - pip install pyqt5
+    - pip install pyqt5-tools
+4) python testui.py ( to run )
+5) 'Start' will take awhile to load after clicked, starting containers, will put a loading bar in the future
+6) 'Main Page' will bring you to main page without starting containers
+6) So far only historical data is done, archive in historical data not done yet.
