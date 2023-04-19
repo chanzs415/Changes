@@ -57,15 +57,21 @@ services:
  
   spark:
     container_name: sparkcontainer
+    image: ubunimage
     build: ./spark
     volumes:
       - hadoop_namenode:/hadoop/dfs/name
     command: tail -f /dev/null
 
   visualization:
-    build: ./visualization
+    container_name: viscontainer
+    image: ubunimage
+    ports:
+      - "8501:8501"
     volumes:
       - hadoop_namenode:/hadoop/dfs/name
+    entrypoint: streamlit run
+    command: visualapp.py
 
   zookeeper:
     image: confluentinc/cp-zookeeper:6.2.0
