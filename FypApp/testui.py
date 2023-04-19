@@ -1,6 +1,6 @@
 import os, subprocess, shutil
 import sys
-from PyQt5 import QtCore, QtGui, QtWidgets, QtWebEngineWidgets
+from PyQt5 import QtCore, QtGui, QtWidgets
 from PyQt5.QtCore import QProcess, QUrl, QTextStream, Qt
 from PyQt5.QtWidgets import QApplication, QMainWindow, QStackedWidget, QWidget, QVBoxLayout, QGridLayout, QPushButton, QLabel, QListWidget, QListWidgetItem, QMessageBox
 from PyQt5.QtWebEngineWidgets import *
@@ -9,11 +9,6 @@ from send2trash import send2trash
 from subprocess import check_output
 import tkinter as tk
 from tkinter import messagebox
-
-class WebPage(QtWebEngineWidgets.QWebEngineView):
-    def __init__(self, url):
-        super(WebPage, self).__init__()
-        self.setUrl(QUrl(url))
 
 class ListBoxWidget(QListWidget):
     def __init__(self, parent=None):
