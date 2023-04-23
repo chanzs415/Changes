@@ -87,3 +87,4 @@ PS: to leave from bash cmd use Ctrl-Z
 5) 'Start' will take awhile to load after clicked, starting containers, will put a loading bar in the future
 6) 'Main Page' will bring you to main page without starting containers
 6) So far only historical data is done, archive in historical data not done yet.
+7) docker-compose up first to download the images first
