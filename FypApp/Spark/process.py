@@ -1,11 +1,20 @@
+import sys
 from pyspark.sql.functions import *
 from pyspark.ml.feature import Imputer, StringIndexer, IndexToString, OneHotEncoder
 from pyspark.sql import SparkSession
 
+if len(sys.argv) < 2:
+    print("Please provide the input file path as a command-line argument.")
+    sys.exit(1)
+
+# Get the input file path from command-line argument
+input_file_path = sys.argv[1]
+
 # create SparkSession
 spark = SparkSession.builder.appName("MyApp").getOrCreate()
 # Read in csv file
-df = spark.read.format("csv").option("header", "true").load("hdfs://namenode:9000/data/combined_csv.csv")
+df = spark.read.format("csv").option("header", "true").load(input_file_path)
+#df = spark.read.format("csv").option("header", "true").load("hdfs://namenode:9000/data/combined_csv.csv")
 
 # Check for duplicates
 duplicates = df.groupBy(*df.columns).count().filter(col("count") > 1)

@@ -1,8 +1,8 @@
-import os, subprocess, shutil
+import os, subprocess, shutil, signal
 import sys
 from PyQt5 import QtCore, QtGui, QtWidgets
-from PyQt5.QtCore import QProcess, QUrl, QTextStream, Qt
-from PyQt5.QtWidgets import QApplication, QMainWindow, QStackedWidget, QFileDialog,QWidget, QVBoxLayout, QGridLayout, QPushButton, QLabel, QListWidget, QListWidgetItem, QMessageBox
+from PyQt5.QtCore import QProcess, QUrl, QTextStream, Qt, QTimer
+from PyQt5.QtWidgets import QTextEdit, QApplication, QMainWindow, QStackedWidget, QFileDialog,QWidget, QVBoxLayout, QGridLayout, QPushButton, QLabel, QListWidget, QListWidgetItem, QMessageBox
 from PyQt5.QtWebEngineWidgets import *
 from PyQt5.QtGui import QDesktopServices,QFont
 from send2trash import send2trash
@@ -298,13 +298,13 @@ class Page2(QWidget):
         #docker cp C:\Users\Owner\Desktop\FYP\Changes\FypApp\Spark\processv2.py sparkcontainer:/app  
         #docker cp C:\Users\Owner\Desktop\FYP\Changes\FypApp\Spark\combined_csv2.csv sparkcontainer:/app/data/
         #docker cp namenode:/tmp/data/ C:\Users\Owner\Desktop 
-        directory_path = r'C:\Users\Owner\Desktop\FYP\Changes\FypApp\hadoop_namenode'
+        directory_path = r'C:\Users\Owner\Desktop\FYP\Test\Changes\FypApp\hadoop_namenode'
         if os.path.exists(directory_path):
             shutil.rmtree(directory_path)
         else:
             print(f"Directory '{directory_path}' does not exist.")
-
-        command1 = f'docker cp C:\\Users\\Owner\\Desktop\\FYP\\Changes\\FypApp\\Spark\\combined_csv2.csv sparkcontainer:/app/data/'
+        command1 = f'docker exec -it sparkcontainer python3 mainv2.py'
+        #command1 = f'docker cp C:\\Users\\Owner\\Desktop\\FYP\\Test\\Changes\\FypApp\\Spark\\data-clean-realtime.py sparkcontainer:/app'
         output1 = subprocess.check_output(command1, shell=True)
         print(output1.decode())
 
@@ -312,7 +312,7 @@ class Page2(QWidget):
 
     #transfers the fetched api to hdfs
     def trxHDFS(self):
-        directory_path = r'C:\Users\Owner\Desktop\FYP\Changes\FypApp\hadoop_namenode'
+        directory_path = r'C:\Users\Owner\Desktop\FYP\Test\Changes\FypApp\hadoop_namenode'
         if os.path.exists(directory_path):
             shutil.rmtree(directory_path)
         else:
@@ -353,7 +353,7 @@ class Page2(QWidget):
     #process the data
     def processHist(self):
         try:
-            directory_path = r'C:\Users\Owner\Desktop\FYP\Changes\FypApp\hadoop_namenode'
+            directory_path = r'C:\Users\Owner\Desktop\FYP\Test\Changes\FypApp\hadoop_namenode'
             if os.path.exists(directory_path):
                 shutil.rmtree(directory_path)
             else:
@@ -364,7 +364,7 @@ class Page2(QWidget):
             full_path = item.text()
             # Extract filename from full path
             filename = os.path.basename(full_path)
-            command5 = f'docker exec -it sparkcontainer spark-submit process.py hdfs://namenode:9000/data/' + filename
+            command5 = f'docker exec -it sparkcontainer spark-submit data-clean-historical.py hdfs://namenode:9000/data/' + filename
             # Run the command and capture the output
             output = subprocess.check_output(command5, shell=True, stderr=subprocess.STDOUT)
             #Print the output
@@ -490,12 +490,17 @@ class Page3(QWidget):
         self.pushButton35= QPushButton("Process")
         self.pushButton36= QPushButton("Analyse")
         self.backButton37 = QPushButton('Back')
-
+        self.textEdit = QTextEdit()
         
-        self.pushButton31.clicked.connect(lambda: print(self.getSelectedItem()))
+        #self.pushButton31.clicked.connect(lambda: print(self.getSelectedItem()))
+        self.pushButton33.clicked.connect(self.realTimeStream)
+        self.pushButton34.clicked.connect(self.killStream)
         self.backButton37.clicked.connect(self.goBack)
 
-        #layout3.addWidget(self.listview, 0, 0 , 4, 1) #row, columns, occupy no. rows, occupy no. colums
+        self.timer = QTimer()
+        self.timer.timeout.connect(self.updateOutput)
+
+        layout3.addWidget(self.textEdit, 0, 0 , 4, 1) #row, columns, occupy no. rows, occupy no. colums
         layout3.addWidget(self.pushButton31, 0, 1)
         layout3.addWidget(self.labelData32, 0, 2) 
         layout3.addWidget(self.pushButton33, 1, 1)
@@ -503,6 +508,7 @@ class Page3(QWidget):
         layout3.addWidget(self.pushButton35, 2, 1)
         layout3.addWidget(self.pushButton36, 2, 2)
         layout3.addWidget(self.backButton37, 6, 3)
+        
         self.setLayout(layout3)
     
     # RT Page ===================================================================================
@@ -536,30 +542,101 @@ class Page3(QWidget):
         
 
     def realTimeStream(self):
-        process1 = QProcess(None)
-        command1 = r"docker exec -it sparkcontainer python3 /app/data/test.py"
-        process1.start(command1)
-        process1.waitForFinished()
+        try:
+            command1 = "docker exec -d sparkcontainer python3 /app/data/test.py"
+            subprocess.run(command1, shell=True, check=True)
+            print("Stream1 started successfully.")
 
-        process2 = QProcess(None)
-        command2 = r"docker run -it --rm ubunimage python3 /app/bin/sendStream.py -h"
-        process2.start(command2)
-        output = process2.readAllStandardOutput().data().decode()
-        self.label1.setText(output)
-        process2.waitForFinished()
-        
-        process3 = QProcess(None)
-        command3 = r"docker exec -it sparkcontainer python3 /app/bin/processStream.py my-stream"
-        process3.start(command3)
-        process3.waitForFinished()
+            command2 = f'docker run -it --rm ubunimage python3 /app/bin/sendStream.py -h'
+            output2 = subprocess.check_output(command2, shell=True)
+            print(output2.decode())
+            print("command 2 ran")
 
-        process4 = QProcess(None)
-        command4 = r"docker exec -it sparkcontainer python3 /app/bin/sendStream.py /app/.\data.csv my-stream"
-        process4.start(command4)
-        output = process4.readAllStandardOutput().data().decode()
-        self.label1.setText(output)
-        process4.waitForFinished()
+            command3 = f'docker exec -d sparkcontainer python3 /app/bin/processStream.py my-stream'
+            self.process53 = subprocess.Popen(command3, stdout=subprocess.PIPE, stderr=subprocess.PIPE, shell=True)
+            print("Stream2 started successfully.")
+
+            command4 = f'docker exec -d sparkcontainer python3 /app/bin/sendStream.py /app/data.csv my-stream'
+            subprocess.run(command4, shell=True, check=True)
+            self.process55 = subprocess.Popen(command4, stdout=subprocess.PIPE, stderr=subprocess.PIPE, shell=True)
+            print("Stream3 started successfully.")
+
+            self.timer.start(5000)
+
+        except subprocess.CalledProcessError as e:
+            print(f"Error starting stream: {e}")
+
+    def updateOutput(self):
+        # read available data from the process
+        output = self.process53.stdout.readline().decode()
+        # update text edit widget with new data
+        #self.textEdit.moveCursor(Qt.QTextCursor.End)
+        if output:
+            self.textEdit.append(output)
     
+    def killStream(self):
+        commands = [
+        "docker exec sparkcontainer pgrep -f test.py",
+        "docker exec sparkcontainer pgrep -f processStream.py",
+        "docker exec sparkcontainer pgrep -f sendStream.py"
+        ]
+        for command in commands:
+            try:
+                output = subprocess.check_output(command, shell=True)
+                pids = output.decode().strip().split("\n")
+                for pid in pids:
+                    try:
+                        subprocess.check_output(f"docker exec sparkcontainer kill {pid}", shell=True)
+                        print(f"Process with PID {pid} killed.")
+                    except subprocess.CalledProcessError as e:
+                        print(f"Error killing process with PID {pid}: {e}")
+            except subprocess.CalledProcessError as e:
+                print(f"Error getting process ID: {e}")
+        print("Stream stopped successfully.")
+
+    def processHist(self):
+        try:
+            directory_path = r'C:\Users\Owner\Desktop\FYP\Changes\FypApp\hadoop_namenode'
+            if os.path.exists(directory_path):
+                shutil.rmtree(directory_path)
+            else:
+                print(f"Directory '{directory_path}' does not exist.")
+
+            #process data
+            item = self.listview.currentItem()
+            full_path = item.text()
+            # Extract filename from full path
+            filename = os.path.basename(full_path)
+            command5 = f'docker exec -it sparkcontainer spark-submit process.py hdfs://namenode:9000/data/' + filename
+            # Run the command and capture the output
+            output = subprocess.check_output(command5, shell=True, stderr=subprocess.STDOUT)
+            #Print the output
+            print(output.decode())
+
+        # Show a message box after the function has finished running
+            messagebox.showinfo('Finished', 'Processing complete!')
+        except Exception as e:
+            # Show a message box with the error message if an exception occurs
+            messagebox.showerror('Error', str(e))
+
+    #open up streamlit
+    def viewHist(self):
+        try:
+            directory_path = r'C:\Users\Owner\Desktop\FYP\Changes\FypApp\hadoop_namenode'
+            if os.path.exists(directory_path):
+                shutil.rmtree(directory_path)
+            else:
+                print(f"Directory '{directory_path}' does not exist.")
+            command6 = f'docker cp sparkcontainer:/usr/local/output hadoop_namenode/'
+            check_output(command6, shell=True)
+            command7 = f'docker cp hadoop_namenode/ viscontainer:/usr/local/'
+            check_output(command7, shell=True)
+        except subprocess.CalledProcessError as e:
+            print(f'Error: {e.returncode}, Output: {e.output.decode()}')
+        
+        url = QUrl("http://localhost:8501")  # URL to open in the web browser
+        QDesktopServices.openUrl(url)
+
     def closeEvent(self):
         super().closeEvent()
 

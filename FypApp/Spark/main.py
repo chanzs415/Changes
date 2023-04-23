@@ -1,50 +1,69 @@
+import numpy as np
 import pandas as pd
 import requests
-import json
-import csv
-import os
-import glob
+import time
 from datetime import date
+import json
+import os
+
+
+# set WeatherAPI key and locations
+api_key = '029a436baa02494fbe583505230304'
+locations = ['Singapore', 'Australia', 'Malaysia'] #this have to be change to accomodate user define
 
 # get today date
-today_is = date.today().strftime("%Y-%m-%d")
-#print(today_is) #output: 2023-03-14 #test code
+Date_is = date.today().strftime("%Y-%m-%d") # this code have to be change so that user can define the date to get
+#print(today_is) #test code
+
+# make an empty dataframe
+df_all=[]
 
 # make a directory to save the downloaded csv files
 save_dir = "/app/data"
-
 # to create the directory if not existed
 if not os.path.exists(save_dir):
     os.makedirs(save_dir)
 
-country = ["australia", "singapore"]
+def main():
+    for location in locations:
+        try:
+            # api call - data receive in json
+            url = f"http://api.weatherapi.com/v1/history.json?key={api_key}&q={location}&dt={Date_is}"
+            response = requests.get(url)
 
-for i in range(len(country)):
-    # Set up the API endpoint URL
-    url = "https://weather.visualcrossing.com/VisualCrossingWebServices/rest/services/timeline/" + country[i] + "/" + "2022-06-01" + "/" + today_is + "?unitGroup=metric&include=days&key=8MJQ4966D6CWWU5GBV7KBHBDS&contentType=csv"
-    #print(url) #test code
+            #check for any error
+            response.raise_for_status()
 
-    try:
-        df=pd.read_csv(url)
+            data = json.loads(response.text)
 
-        # set up the path to save the csv files
-        filePath = os.path.join(save_dir, "data_"+country[i]+".csv")
+            # Create a DataFrame from the 'hour' list in the JSON data
+            df = pd.DataFrame(data["forecast"]["forecastday"][0]["hour"])
 
-        # save the csv files
-        df.to_csv(filePath, index=False)
-        #print("data_"+country[i]+".csv") #test code
+            # Add new columns for location and time information
+            df["location"] = location
+            df["time"] = df["time"].str.split("+").str[0]
 
-    except Exception as e:
-        print(f"Error occurred while processing {country[i]}: {e}")
+            # Parse the 'time' column to extract the hour information
+            df["hour"] = pd.to_datetime(df["time"], format="%Y-%m-%d %H:%M").dt.hour
 
-#concat
-os.chdir("/app/data")
+            # Set the 'time' and 'location' columns as the index
+            df.set_index(["location", "time"], inplace=True)
 
-extension = "csv"
-all_filenames = [i for i in
-    glob.glob('*.{}'.format(extension))]
+            # Append the DataFrame to the list
+            df_all.append(df)
 
-#combine all files in the llist
-combined_csv = pd.concat([pd.read_csv(f) for f in all_filenames])
-#export to csv
-combined_csv.to_csv("combined_csv.csv", index=False, encoding='utf-8-sig')
+        except Exception as e:
+            print("Error occur: ",e)
+
+    # Concatenate the DataFrames into a single DataFrame
+    concated_df = pd.concat(df_all)
+
+    # set up the path to save the csv files
+    filePath = os.path.join(save_dir, "combined_csv.csv")
+
+    # Save the DataFrame to a CSV file
+    concated_df.to_csv(filePath, index=True)
+
+if __name__ == "__main__":
+    main()
+
