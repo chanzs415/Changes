@@ -74,6 +74,7 @@ services:
     command: visualapp.py
 
   zookeeper:
+    container_name: zoocontainer
     image: confluentinc/cp-zookeeper:6.2.0
     environment: 
       - ZOOKEEPER_CLIENT_PORT=32181
@@ -81,6 +82,7 @@ services:
       - "32181:32181"
 
   kafka:
+    container_name: kafcontainer
     image: confluentinc/cp-kafka:6.2.0
     environment:
       - KAFKA_BROKER_ID=1

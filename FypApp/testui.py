@@ -2,7 +2,7 @@ import os, subprocess, shutil
 import sys
 from PyQt5 import QtCore, QtGui, QtWidgets
 from PyQt5.QtCore import QProcess, QUrl, QTextStream, Qt
-from PyQt5.QtWidgets import QApplication, QMainWindow, QStackedWidget, QWidget, QVBoxLayout, QGridLayout, QPushButton, QLabel, QListWidget, QListWidgetItem, QMessageBox
+from PyQt5.QtWidgets import QApplication, QMainWindow, QStackedWidget, QFileDialog,QWidget, QVBoxLayout, QGridLayout, QPushButton, QLabel, QListWidget, QListWidgetItem, QMessageBox
 from PyQt5.QtWebEngineWidgets import *
 from PyQt5.QtGui import QDesktopServices,QFont
 from send2trash import send2trash
@@ -10,8 +10,10 @@ from subprocess import check_output
 import tkinter as tk
 from tkinter import messagebox
 
+
 class ListBoxWidget(QListWidget):
-    def __init__(self, parent=None):
+    dropEventSignal = QtCore.pyqtSignal() # Custom signal
+    def __init__(self, parent=None):   
         super().__init__(parent)
         self.setAcceptDrops(True)
         self.resize(600, 600)
@@ -77,66 +79,82 @@ class ListBoxWidget(QListWidget):
 
         else:
             event.ignore()
-        self.mainwindow = MainWindow()
-        self.mainwindow.trxHDFS()
+        
+        self.dropEventSignal.emit() # Emit the custom signal
 
     def fileDel (self, filePath):
         item = self.listbox.findItems(file_path, Qt.MatchExactly)
         if item:
             self.listbox.takeItem(self.listbox.row(item[0]))
 
-class MainWindow(QMainWindow):
-    def __init__(self):
-        #Mainwindow
-        super().__init__()
-        self.setWindowTitle("Main Window")
-        self.resize(800,600)
 
-        # create stacked widget for the different pages
-        self.stackedWidget = QStackedWidget()
-        self.setCentralWidget(self.stackedWidget)
+#Starting page
+class Page0(QWidget):
+    def __init__(self,stackedWidget):
+        super().__init__()
+        self.stackedWidget = stackedWidget
 
         font = QtGui.QFont()
         font.setPointSize(16)
 
-        #0------------------------------------------------------------------------------------------
-
-        # create layout and page0
         layout0 = QVBoxLayout()
-        page0 = QWidget() #start page
 
-        #pull image button
-        self.pushButton01 = QPushButton("Start") #run containers, runs docker-compose up
+        self.pushButton01 = QPushButton("Start")
         self.pushButton01.setFixedSize(250, 90)
         self.pushButton01.setFont(font)
         self.pushButton01.setObjectName("pushButton01")
 
-        #About
-        self.pushButton02 = QPushButton("About") #run containers, runs docker-compose up
+        self.pushButton02 = QPushButton("About")
         self.pushButton02.setFixedSize(250, 90)
         self.pushButton02.setFont(font)
         self.pushButton02.setObjectName("pushButton02")
 
-        #About
-        self.pushButton03 = QPushButton("Main Page") #run containers, runs docker-compose up
+        self.pushButton03 = QPushButton("Main Page")
         self.pushButton03.setFixedSize(250, 90)
         self.pushButton03.setFont(font)
         self.pushButton03.setObjectName("pushButton03")
 
-        #add button function on click
         self.pushButton01.clicked.connect(self.startPage)
         self.pushButton03.clicked.connect(self.goMain)
 
-        layout0.addWidget(self.pushButton01) # Add the button to the grid layout1 at row 0, column 0
+        layout0.addWidget(self.pushButton01)
         layout0.addWidget(self.pushButton02)
         layout0.addWidget(self.pushButton03)
-        page0.setLayout(layout0)
 
+        self.setLayout(layout0)
+
+        #starts the docker containers
+    def startPage(self):
+        process = QProcess(None)
+        command1 = r'docker-compose -f C:\Users\Owner\Desktop\FYP\Changes\FypApp\docker-compose.yml up'
+        process.start(command1)
+        process.waitForFinished()
+        output = process.readAllStandardOutput().data().decode()
+        print(output)
+        
+        #goes to main page after containers have started up
+        self.stackedWidget.setCurrentIndex(1)
+
+    #Go to main page
+    def goMain(self):
+        self.stackedWidget.setCurrentIndex(1)
+
+    #prompts a confirm close before closing app, and docker-compose stop
+    def closeEvent(self):
+        super().closeEvent()
+
+#MainPage
+class Page1(QWidget):
+    def __init__(self,stackedWidget):
+        super().__init__()
+        self.stackedWidget = stackedWidget
+
+        font = QtGui.QFont()
+        font.setPointSize(16)
         #1------------------------------------------------------------------------------------------
 
         # layout and page1
         layout1 = QGridLayout()
-        page1 = QWidget() #main page
 
         #go back
         self.pushButton11 = QtWidgets.QPushButton("Back")
@@ -187,185 +205,8 @@ class MainWindow(QMainWindow):
         self.pushButton14.clicked.connect(self.doSQL)
         self.pushButton15.clicked.connect(self.stopCommand)
         #add layout1 to page1
-        page1.setLayout(layout1)
-        
-        #2-----------------------------------------------------------------------------------------
+        self.setLayout(layout1)
 
-        # layout and page2 (Hist page)
-        layout2 = QGridLayout()
-        page2 = QWidget() #test print commandline
-        #configure 2nd page
-        self.listview = ListBoxWidget(self)
-        self.labelData21 = QLabel("Hist data here")
-        self.pushButton22= QPushButton("Fetch Data")
-        self.pushButton23= QPushButton("Process")
-        self.pushButton24= QPushButton("Analyse")
-        self.pushButton25= QPushButton("Delete")
-        self.pushButton26= QPushButton("Archive")
-        self.backButton27 = QPushButton('Back')
-        self.pushButton28 = QPushButton('Refresh', self)
-
-        self.pushButton22.clicked.connect(self.getHist)
-        #self.pushButton22.clicked.connect(lambda: print(self.getSelectedItem()))
-        self.pushButton23.clicked.connect(self.processHist)
-        self.pushButton24.clicked.connect(self.viewHist)
-        self.pushButton25.clicked.connect(lambda: self.confirmationBox('Delete'))
-        self.pushButton26.clicked.connect(lambda: self.confirmationBox('Archive'))
-        self.pushButton28.clicked.connect(self.refreshHist)
-        
-
-        self.backButton27.clicked.connect(self.goBack)
-        layout2.addWidget(self.listview, 0, 0 , 4, 1) #row, columns, occupy no. rows, occupy no. colums
-        layout2.addWidget(self.labelData21, 0, 1)
-        layout2.addWidget(self.pushButton22, 0, 2) 
-        layout2.addWidget(self.pushButton23, 1, 1)
-        layout2.addWidget(self.pushButton24, 1, 2)
-        layout2.addWidget(self.pushButton25, 2, 1)
-        layout2.addWidget(self.pushButton26, 2, 2)
-        layout2.addWidget(self.pushButton28, 3, 1)
-        layout2.addWidget(self.backButton27, 6, 3)
-        
-        page2.setLayout(layout2)
-
-        #3------------------------------------------------------------------------------------------
-
-        # layout and page3(RT page)
-        layout3 = QGridLayout()
-        page3 = QWidget() #test print commandline
-        #configure 3rd page
-        
-        #self.listview = ListBoxWidget(self)
-        self.pushButton31= QPushButton("Fetch Data")
-        self.labelData32 = QLabel("RT data here")
-        self.pushButton33= QPushButton("Start")
-        self.pushButton34= QPushButton("Stop")
-        self.pushButton35= QPushButton("Process")
-        self.pushButton36= QPushButton("Analyse")
-        self.backButton37 = QPushButton('Back')
-
-        
-        self.pushButton31.clicked.connect(lambda: print(self.getSelectedItem()))
-        self.backButton37.clicked.connect(self.goBack)
-
-        #layout3.addWidget(self.listview, 0, 0 , 4, 1) #row, columns, occupy no. rows, occupy no. colums
-        layout3.addWidget(self.pushButton31, 0, 1)
-        layout3.addWidget(self.labelData32, 0, 2) 
-        layout3.addWidget(self.pushButton33, 1, 1)
-        layout3.addWidget(self.pushButton34, 1, 2)
-        layout3.addWidget(self.pushButton35, 2, 1)
-        layout3.addWidget(self.pushButton36, 2, 2)
-        layout3.addWidget(self.backButton37, 6, 3)
-        page3.setLayout(layout3)
-
-        #4------------------------------------------------------------------------------------------    
-
-        # layout and page4(SQL page)
-        layout4 = QVBoxLayout()
-        page4 = QWidget() #test print commandline
-        #configure 4th page
-        self.labelData = QLabel("SQL here")
-        self.backButton4 = QPushButton('Back')
-        self.backButton4.clicked.connect(self.goBack)
-        layout4.addWidget(self.labelData)
-        layout4.addWidget(self.backButton4)
-        page4.setLayout(layout4)
-
-        #------------------------------------------------------------------------------------------
-        layout5 = QVBoxLayout()
-        page5 = QWidget()
-        self.listbox_view = ListBoxWidget(self)
-        self.btn = QPushButton('Get Value', self)
-        self.btn.setGeometry(850, 400, 200, 50)
-        self.btn.clicked.connect(lambda: print(self.getSelectedItem2()))
-        layout5.addWidget(self.listbox_view)
-        layout5.addWidget(self.btn)
-        page5.setLayout(layout5)
-
-        #-----------------------------------------------------------------------------------------
-        layout6 = QVBoxLayout()
-        page6 = QWidget()
-
-        self.labelStart = QLabel('Starting please wait...')
-        self.labelStart.setAlignment(Qt.AlignCenter)  # set alignment to center
-        font2 = QFont()
-        font2.setPointSize(30)  # set font size to 30
-        self.labelStart.setFont(font2)  # set font for the label
-        layout6.addWidget(self.labelStart)
-        page6.setLayout(layout6)
-
-
-
-        # add pages to the main stacked widget
-        self.stackedWidget.addWidget(page0)
-        self.stackedWidget.addWidget(page1)
-        self.stackedWidget.addWidget(page2)
-        self.stackedWidget.addWidget(page3)
-        self.stackedWidget.addWidget(page4)
-        self.stackedWidget.addWidget(page5)
-        self.stackedWidget.addWidget(page6)
-
-
-        #self.stackedWidget.setCurrentIndex(6)
-
-    def getSelectedItem(self):
-        item = self.listbox_view.currentItem()
-        if item is not None:
-            full_path = item.text()
-            # Extract filename from full path
-            filename = os.path.basename(full_path)
-            return filename
-        else:
-            return None
-#Page 0 ======================================================================================
-
-    #starts the docker containers
-    def startPage(self):
-        process = QProcess(None)
-        command1 = r'docker-compose -f C:\Users\Owner\Desktop\FYP\Changes\FypApp\docker-compose.yml up'
-        process.start(command1)
-        process.waitForFinished()
-        output = process.readAllStandardOutput().data().decode()
-        print(output)
-        
-        #goes to main page after containers have started up
-        self.stackedWidget.setCurrentIndex(1)
-
-    #Go to main page
-    def goMain(self):
-        self.stackedWidget.setCurrentIndex(1)
-
-    #prompts a confirm close before closing app, and docker-compose stop
-    def closeEvent(self, event):
-        reply = QMessageBox.question(self, 'Confirm Exit',
-                                    'Are you sure you want to exit?',
-                                    QMessageBox.Yes | QMessageBox.No,
-                                    QMessageBox.No)
-
-        if reply == QMessageBox.Yes:
-            dialog = QMessageBox(self)
-            dialog.setWindowTitle("Exiting...")
-            dialog.setText("Application is closing...")
-            dialog.setStandardButtons(QMessageBox.NoButton)
-            dialog.setModal(True)
-            dialog.show()
-
-            process = QProcess(None)
-            command = r'docker-compose -f C:\Users\Owner\Desktop\FYP\Changes\FypApp\docker-compose.yml stop'
-            process.start(command)
-            process.waitForFinished()
-
-            output = process.readAllStandardOutput().data().decode()
-            print(output)
-
-            event.accept()
-        else:
-            event.ignore()
-
-    #back button function to go back main page
-    def goBack(self):
-       self.stackedWidget.setCurrentIndex(1)
-
-#Main Page====================================================================================
     #Goes to RT page
     def analyseRT(self):
         self.stackedWidget.setCurrentIndex(3)
@@ -373,7 +214,6 @@ class MainWindow(QMainWindow):
     #Goes back to starting page
     def goStart(self):
         self.stackedWidget.setCurrentIndex(0)
-
 
     def doSQL(self):
         #for now go to dummy page
@@ -392,7 +232,61 @@ class MainWindow(QMainWindow):
         output = process.readAllStandardOutput().data().decode()
         print(output)
 
-#Hist Page====================================================================================
+    def closeEvent(self):
+        super().closeEvent()
+
+
+#Historical data page
+class Page2(QWidget):
+    def __init__(self,stackedWidget):
+        super().__init__()
+        self.stackedWidget = stackedWidget
+
+        font = QtGui.QFont()
+        font.setPointSize(16)
+
+        #self.listview1 = ListBoxWidget(self)
+        #self.listview.dropEventSignal.connect(self.trxHDFS) # Connect the signal to a slot
+
+        #2-----------------------------------------------------------------------------------------
+
+        # layout and page2 (Hist page)
+        layout2 = QGridLayout()
+
+        #configure 2nd page
+        self.listview = ListBoxWidget(self)
+        self.listview.dropEventSignal.connect(self.trxHDFS) # Connect the signal to a slot
+        self.labelData21 = QLabel("Hist data here")
+        self.pushButton22= QPushButton("Fetch Data")
+        self.pushButton23= QPushButton("Process")
+        self.pushButton24= QPushButton("Analyse")
+        self.pushButton25= QPushButton("Delete")
+        self.pushButton26= QPushButton("Archive")
+        self.backButton27 = QPushButton('Back')
+        self.pushButton28 = QPushButton('Refresh', self)
+
+        self.pushButton22.clicked.connect(self.getHist)
+        #self.pushButton22.clicked.connect(lambda: print(self.getSelectedItem()))
+        self.pushButton23.clicked.connect(self.processHist)
+        self.pushButton24.clicked.connect(self.viewHist)
+        self.pushButton25.clicked.connect(lambda: self.confirmationBox('Delete'))
+        self.pushButton26.clicked.connect(lambda: self.confirmationBox('Archive'))
+        self.pushButton26.clicked.connect(self.goBack)
+        self.pushButton28.clicked.connect(self.refreshHist)
+        self.backButton27.clicked.connect(self.goBack)
+
+        layout2.addWidget(self.listview, 0, 0 , 4, 1) #row, columns, occupy no. rows, occupy no. colums
+        layout2.addWidget(self.labelData21, 0, 1)
+        layout2.addWidget(self.pushButton22, 0, 2) 
+        layout2.addWidget(self.pushButton23, 1, 1)
+        layout2.addWidget(self.pushButton24, 1, 2)
+        layout2.addWidget(self.pushButton25, 2, 1)
+        layout2.addWidget(self.pushButton26, 2, 2)
+        layout2.addWidget(self.pushButton28, 3, 1)
+        layout2.addWidget(self.backButton27, 6, 3)
+        
+        self.setLayout(layout2)
+
     #fetch data from API, currently is from local host
     def getHist(self):
         #Get data from API to store in container's /app/data
@@ -404,6 +298,12 @@ class MainWindow(QMainWindow):
         #docker cp C:\Users\Owner\Desktop\FYP\Changes\FypApp\Spark\processv2.py sparkcontainer:/app  
         #docker cp C:\Users\Owner\Desktop\FYP\Changes\FypApp\Spark\combined_csv2.csv sparkcontainer:/app/data/
         #docker cp namenode:/tmp/data/ C:\Users\Owner\Desktop 
+        directory_path = r'C:\Users\Owner\Desktop\FYP\Changes\FypApp\hadoop_namenode'
+        if os.path.exists(directory_path):
+            shutil.rmtree(directory_path)
+        else:
+            print(f"Directory '{directory_path}' does not exist.")
+
         command1 = f'docker cp C:\\Users\\Owner\\Desktop\\FYP\\Changes\\FypApp\\Spark\\combined_csv2.csv sparkcontainer:/app/data/'
         output1 = subprocess.check_output(command1, shell=True)
         print(output1.decode())
@@ -412,12 +312,18 @@ class MainWindow(QMainWindow):
 
     #transfers the fetched api to hdfs
     def trxHDFS(self):
+        directory_path = r'C:\Users\Owner\Desktop\FYP\Changes\FypApp\hadoop_namenode'
+        if os.path.exists(directory_path):
+            shutil.rmtree(directory_path)
+        else:
+            print(f"Directory '{directory_path}' does not exist.")
+
         command2 = f'docker cp sparkcontainer:/app/ hadoop_namenode/'
         output2 = subprocess.check_output(command2, shell=True)
         print(output2.decode())
         print("Tranferring to volume")
 
-        command3 = f'docker cp hadoop_namenode/app/data namenode:/tmp'
+        command3 = f'docker cp hadoop_namenode/data namenode:/tmp'
         output3 = subprocess.check_output(command3, shell=True)
         print(output3.decode())
         print("transferring to namenode")
@@ -447,16 +353,11 @@ class MainWindow(QMainWindow):
     #process the data
     def processHist(self):
         try:
-            #remove everything in the volume first
             directory_path = r'C:\Users\Owner\Desktop\FYP\Changes\FypApp\hadoop_namenode'
-
-            # Loop through all items in the directory
-            for item in os.listdir(directory_path):
-                item_path = os.path.join(directory_path, item)  # Get the full path of the item
-                if os.path.isfile(item_path):  # Check if the item is a file
-                    send2trash(item_path)  # Remove the file
-                elif os.path.isdir(item_path):  # Check if the item is a directory
-                    shutil.rmtree(item_path)  # Remove the directory and its contents
+            if os.path.exists(directory_path):
+                shutil.rmtree(directory_path)
+            else:
+                print(f"Directory '{directory_path}' does not exist.")
 
             #process data
             item = self.listview.currentItem()
@@ -478,12 +379,18 @@ class MainWindow(QMainWindow):
     #open up streamlit
     def viewHist(self):
         try:
+            directory_path = r'C:\Users\Owner\Desktop\FYP\Changes\FypApp\hadoop_namenode'
+            if os.path.exists(directory_path):
+                shutil.rmtree(directory_path)
+            else:
+                print(f"Directory '{directory_path}' does not exist.")
             command6 = f'docker cp sparkcontainer:/usr/local/output hadoop_namenode/'
             check_output(command6, shell=True)
-            command7 = f'docker cp hadoop_namenode/output viscontainer:/usr/local/'
+            command7 = f'docker cp hadoop_namenode/ viscontainer:/usr/local/'
             check_output(command7, shell=True)
         except subprocess.CalledProcessError as e:
             print(f'Error: {e.returncode}, Output: {e.output.decode()}')
+        
         url = QUrl("http://localhost:8501")  # URL to open in the web browser
         QDesktopServices.openUrl(url)
 
@@ -518,20 +425,87 @@ class MainWindow(QMainWindow):
                     selected_item = self.listview.currentItem()
                     if selected_item is not None:
                         file_path = selected_item.text()
+                        print(file_path)
                         if file_path:
                             try:
                                 self.listview.takeItem(self.listview.row(selected_item))  # Remove the item from the QListWidget
-                                container_id = "sparkcontainer"  # Replace with your container name or ID
+                                container_id = "sparkcontainer"
                                 command = f"docker exec {container_id} rm {file_path}"  # Delete the file from the container
                                 check_output(command, shell=True)
                             except Exception as e:
                                 print(f"Error deleting file: {e}")
             else:
-                print("hello")
+                if text == 'Archive':
+                    file_path = x.text()
+                    # Show a confirmation dialog before deleting the file
+                    confirm = QMessageBox.question(self, 'Archive File', 'Are you sure you want to archive this file?',
+                                                    QMessageBox.Yes | QMessageBox.No)
+                    if confirm == QMessageBox.Yes:
+                        selected_item = self.listview.currentItem()
+                        if selected_item is not None:
+                            file_path = selected_item.text()
+                            if file_path:
+                                try:
+                                    self.listview.takeItem(self.listview.row(selected_item))  # Remove the item from the QListWidget
+                                    container_id = "sparkcontainer"
+
+                                    directory = QFileDialog.getExistingDirectory(self, "Select directory")
+                                    # Use the selected directory for the command
+                                    command1 = f'docker cp {container_id}:{file_path} {directory}'
+                                    output = subprocess.check_output(command1, shell=True)
+                                    print(output.decode())
+                                    
+                                    command = f"docker exec {container_id} rm {file_path}"  # Delete the file from the container
+                                    check_output(command, shell=True)
+                                except Exception as e:
+                                    print(f"Error deleting file: {e}")
         else:
             QMessageBox.warning(self, 'Warning', 'No file selected.', QMessageBox.Ok)
 
-# RT Page ===================================================================================
+    def closeEvent(self):
+        super().closeEvent()
+
+    def goBack(self):
+       self.stackedWidget.setCurrentIndex(1)
+
+#real-time data page
+class Page3(QWidget):
+    def __init__(self,stackedWidget):
+        super().__init__()
+        self.stackedWidget = stackedWidget
+
+        font = QtGui.QFont()
+        font.setPointSize(16)
+        #3------------------------------------------------------------------------------------------
+
+        # layout and page3(RT page)
+        layout3 = QGridLayout()
+        #configure 3rd page
+        
+        #self.listview = ListBoxWidget(self)
+        self.pushButton31= QPushButton("Fetch Data")
+        self.labelData32 = QLabel("RT data here")
+        self.pushButton33= QPushButton("Start")
+        self.pushButton34= QPushButton("Stop")
+        self.pushButton35= QPushButton("Process")
+        self.pushButton36= QPushButton("Analyse")
+        self.backButton37 = QPushButton('Back')
+
+        
+        self.pushButton31.clicked.connect(lambda: print(self.getSelectedItem()))
+        self.backButton37.clicked.connect(self.goBack)
+
+        #layout3.addWidget(self.listview, 0, 0 , 4, 1) #row, columns, occupy no. rows, occupy no. colums
+        layout3.addWidget(self.pushButton31, 0, 1)
+        layout3.addWidget(self.labelData32, 0, 2) 
+        layout3.addWidget(self.pushButton33, 1, 1)
+        layout3.addWidget(self.pushButton34, 1, 2)
+        layout3.addWidget(self.pushButton35, 2, 1)
+        layout3.addWidget(self.pushButton36, 2, 2)
+        layout3.addWidget(self.backButton37, 6, 3)
+        self.setLayout(layout3)
+    
+    # RT Page ===================================================================================
     def read_output(self):
         process = self.sender()
         if isinstance(process, QProcess):
@@ -585,6 +559,145 @@ class MainWindow(QMainWindow):
         output = process4.readAllStandardOutput().data().decode()
         self.label1.setText(output)
         process4.waitForFinished()
+    
+    def closeEvent(self):
+        super().closeEvent()
+
+    def goBack(self):
+       self.stackedWidget.setCurrentIndex(1)
+
+#SQL page
+class Page4(QWidget):
+    def __init__(self,stackedWidget):
+        super().__init__()
+        self.stackedWidget = stackedWidget
+
+        font = QtGui.QFont()
+        font.setPointSize(16)
+
+        # layout and page4(SQL page)
+        layout4 = QVBoxLayout()
+       
+        #configure 4th page
+        self.labelData = QLabel("SQL here")
+        self.backButton4 = QPushButton('Back')
+        self.backButton4.clicked.connect(self.goBack)
+        layout4.addWidget(self.labelData)
+        layout4.addWidget(self.backButton4)
+        self.setLayout(layout4)
+    
+    def closeEvent(self):
+        super().closeEvent()
+
+    def goBack(self):
+       self.stackedWidget.setCurrentIndex(1)
+
+class Page5(QWidget):
+    def __init__(self,stackedWidget):
+        super().__init__()
+        self.stackedWidget = stackedWidget
+
+        font = QtGui.QFont()
+        font.setPointSize(16)
+
+        layout5 = QVBoxLayout()
+       
+        self.listbox_view = ListBoxWidget(self)
+        self.btn = QPushButton('Get Value', self)
+        self.btn.setGeometry(850, 400, 200, 50)
+        self.btn.clicked.connect(lambda: print(self.getSelectedItem2()))
+        layout5.addWidget(self.listbox_view)
+        layout5.addWidget(self.btn)
+        self.setLayout(layout5)
+    
+    def closeEvent(self):
+        super().closeEvent()
+
+#test loading page
+class Page6(QWidget):
+    def __init__(self,stackedWidget):
+        super().__init__()
+        self.stackedWidget = stackedWidget
+
+        font = QtGui.QFont()
+        font.setPointSize(16)
+
+        layout6 = QVBoxLayout()
+        page6 = QWidget()
+
+        self.labelStart = QLabel('Starting please wait...')
+        self.labelStart.setAlignment(Qt.AlignCenter)  # set alignment to center
+        font2 = QFont()
+        font2.setPointSize(30)  # set font size to 30
+        self.labelStart.setFont(font2)  # set font for the label
+        layout6.addWidget(self.labelStart)
+        page6.setLayout(layout6)
+    
+    def closeEvent(self):
+        super().closeEvent()
+
+
+class MainWindow(QMainWindow):
+    def __init__(self):
+        #Mainwindow
+        super().__init__()
+        self.setWindowTitle("Main Window")
+        self.resize(800,600)
+
+        # create stacked widget for the different pages
+        self.stackedWidget = QStackedWidget()
+        self.setCentralWidget(self.stackedWidget)
+
+        font = QtGui.QFont()
+        font.setPointSize(16)
+
+        #0------------------------------------------------------------------------------------------
+
+        self.page0 = Page0(self.stackedWidget)
+        self.page1 = Page1(self.stackedWidget)
+        self.page2 = Page2(self.stackedWidget)
+        self.page3 = Page3(self.stackedWidget)
+        self.page4 = Page4(self.stackedWidget)
+        self.page5 = Page5(self.stackedWidget)
+        self.page6 = Page6(self.stackedWidget)
+        #self.stackedWidget.addWidget(self.page0)
+
+        # add pages to the main stacked widget
+        self.stackedWidget.addWidget(self.page0)
+        self.stackedWidget.addWidget(self.page1)
+        self.stackedWidget.addWidget(self.page2)
+        self.stackedWidget.addWidget(self.page3)
+        self.stackedWidget.addWidget(self.page4)
+        self.stackedWidget.addWidget(self.page5)
+        self.stackedWidget.addWidget(self.page6)
+        #self.stackedWidget.setCurrentIndex(6)
+
+    #prompts a confirm close before closing app, and docker-compose stop
+    def closeEvent(self, event):
+        reply = QMessageBox.question(self, 'Confirm Exit',
+                                    'Are you sure you want to exit?',
+                                    QMessageBox.Yes | QMessageBox.No,
+                                    QMessageBox.No)
+
+        if reply == QMessageBox.Yes:
+            dialog = QMessageBox(self)
+            dialog.setWindowTitle("Exiting...")
+            dialog.setText("Application is closing...")
+            dialog.setStandardButtons(QMessageBox.NoButton)
+            dialog.setModal(True)
+            dialog.show()
+
+            process = QProcess(None)
+            command = r'docker-compose -f C:\Users\Owner\Desktop\FYP\Changes\FypApp\docker-compose.yml stop'
+            process.start(command)
+            process.waitForFinished()
+
+            output = process.readAllStandardOutput().data().decode()
+            print(output)
+
+            event.accept()
+        else:
+            event.ignore()
 
 
 if __name__ == '__main__':
