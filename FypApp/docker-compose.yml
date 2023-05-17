@@ -73,6 +73,16 @@ services:
     entrypoint: streamlit run
     command: visualapp.py
 
+  visualization2:
+    container_name: viscontainer2
+    image: ubunimage
+    ports:
+      - "8502:8501"
+    volumes:
+      - hadoop_namenode:/hadoop/dfs/name
+    entrypoint: streamlit run
+    command: visualapp.py
+
   zookeeper:
     container_name: zoocontainer
     image: confluentinc/cp-zookeeper:6.2.0
@@ -87,7 +97,7 @@ services:
     environment:
       - KAFKA_BROKER_ID=1
       - KAFKA_ZOOKEEPER_CONNECT=zookeeper:32181
-      - KAFKA_ADVERTISED_LISTENERS=PLAINTEXT://localhost:9092
+      - KAFKA_ADVERTISED_LISTENERS=PLAINTEXT://kafka:9092
       - KAFKA_OFFSETS_TOPIC_REPLICATION_FACTOR=1
       - KAFKA_AUTO_CREATE_TOPICS_ENABLE=true
     ports:

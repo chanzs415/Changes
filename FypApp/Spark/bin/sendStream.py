@@ -2,7 +2,11 @@
 
 """Generates a stream to Kafka from a time series csv file.
 """
+#!/usr/bin/env python
 
+"""Generates a stream to Kafka from a time series csv file.
+"""
+import traceback
 import argparse
 import csv
 import json
@@ -36,56 +40,44 @@ def main():
             'client.id': socket.gethostname()}
     producer = Producer(conf)
 
-    rdr = csv.reader(open(args.filename))
-    #next(rdr)  # Skip header
-    firstline = True
-
     while True:
         try:
-            if firstline is True:
-                line1 = next(rdr, None)
-                v0, v1, v2, v3 = line1[0], datetime.strptime(line1[1], '%Y-%m-%d %H:%M'), float(line1[2]), float(line1[3])
-                v4, v5, v6 = float(line1[4]), float(line1[5]), float(line1[6])
-                # Convert csv columns to key value pair
-                result = {}
-                result["Location"] = [v0]
-                result["Last Updated"] = v1.strftime('%Y-%m-%d %H:%M')
-                result["Temperature (C)"] = v2
-                result["Precipitation (mm)"] = v3
-                result["Humidity"] = v4
-                result["Cloud Cover"] = v5
-                result["UV Index"] = v6
-                # Convert dict to json as message format
-                jresult = json.dumps(result)
-                firstline = False
-                producer.produce(topic, key=p_key, value=jresult, callback=acked)
+            with open(args.filename, "r") as f:
+                rdr = csv.reader(f)
+                #next(rdr)  # Skip header
 
-            else:
-                line = next(rdr, None)
-                result = {}
-                v0, v1, v2, v3 = line[0], datetime.strptime(line[1], '%Y-%m-%d %H:%M'), float(line[2]), float(line[3])
-                v4, v5, v6 = float(line[4]), float(line[5]), float(line[6])
-                # Convert csv columns to key value pair
-                result = {}
-                result["Location"] = [v0]
-                result["Last Updated"] = v1.strftime('%Y-%m-%d %H:%M')
-                result["Temperature (C)"] = v2
-                result["Precipitation (mm)"] = v3
-                result["Humidity"] = v4
-                result["Cloud Cover"] = v5
-                result["UV Index"] = v6
-                # Convert dict to json as message format
-                jresult = json.dumps(result)
-                firstline = False
-                producer.produce(topic, key=p_key, value=jresult, callback=acked)
-            producer.flush()
-            time.sleep(61)
-        except TypeError:
+                for line in rdr:
+                    result = {}
+                    v0, v1, v2, v3 = line[0], datetime.strptime(line[1], '%Y-%m-%d %H:%M'), float(line[2]), float(line[3])
+                    v4, v5, v6, v7 = float(line[4]), float(line[5]), str(line[6]), float(line[7])
+                    v8, v9, v10 = float(line[8]), float(line[9]), float(line[10])
+                    v11, v12 = float(line[11]), float(line[12])
+                    # Convert csv columns to key value pair
+                    result["Location"] = [v0]
+                    result["Last Updated"] = v1.strftime('%Y-%m-%d %H:%M')
+                    result["Temperature (C)"] = v2
+                    result["Temperature (F)"] = v3
+                    result["Wind (km/hr)"] = v4
+                    result["Wind direction (in degree)"] = v5
+                    result["Wind direction (compass)"] = v6
+                    result["Pressure (millibars)"] = v7
+                    result["Precipitation (mm)"] = v8
+                    result["Humidity"] = v9
+                    result["Cloud Cover"] = v10
+                    result["UV Index"] = v11
+                    result["Wind Gust (km/hr)"] = v12
+                    # Convert dict to json as message format
+                    jresult = json.dumps(result)
+                    producer.produce(topic, key=p_key, value=jresult, callback=acked)
+                    producer.flush()
+                    time.sleep(1 / args.speed)
+
+            time.sleep(60)
+        except Exception:
+            traceback.print_exc()
             sys.exit()
+
+
 
 if __name__ == "__main__":
     main()
-
-
-
-
