@@ -87,7 +87,7 @@ else:
     print(f"Successfully cleaning data.")
 print("Progress: 90%")
 df.show()
-df.sort()
+df = df.sort(df.columns[0])
 print(f"Importing to csv...")
 df.write.mode("overwrite").csv("/usr/local/output", header=True)
 print("Progress: 100%")

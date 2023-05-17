@@ -1,19 +1,42 @@
 import os, subprocess, shutil, signal, docker
 import sys, time, threading
 from PyQt5 import QtCore, QtGui, QtWidgets
-from PyQt5.QtCore import QDate,QProcess, QUrl, QTextStream, Qt, QTimer, QThread, pyqtSignal, pyqtSlot, QBasicTimer
-from PyQt5.QtWidgets import QTextEdit, QProgressBar, QDateEdit,QHBoxLayout,QLineEdit, QApplication, QMainWindow, QStackedWidget, QFileDialog,QWidget, QVBoxLayout, QGridLayout, QPushButton, QLabel, QListWidget, QListWidgetItem, QMessageBox
+from PyQt5.QtCore import QDate,QProcess, QUrl, Qt, QTimer, QThread, pyqtSignal, pyqtSlot, QBasicTimer,pyqtSignal
+from PyQt5.QtWidgets import QApplication,QDialog, QProgressBar, QDateEdit,QHBoxLayout,QLineEdit, QApplication, QMainWindow, QStackedWidget, QFileDialog,QWidget, QVBoxLayout, QGridLayout, QPushButton, QLabel, QListWidget, QListWidgetItem, QMessageBox
 from PyQt5.QtWebEngineWidgets import *
 from PyQt5.QtGui import QDesktopServices,QFont
-from send2trash import send2trash
+#from send2trash import send2trash
 from subprocess import check_output
 import tkinter as tk
 from tkinter import messagebox
 
 #Custom widgets
+class dataFiles2(QThread):
+    progressUpdate = pyqtSignal(int)
+    def run(self):
+        directory_path = r'.\hadoop_namenode'
+        if os.path.exists(directory_path):
+            shutil.rmtree(directory_path)
+        else:
+            print(f"*Running Ignore* Directory '{directory_path}' does not exist.")
+        self.progressUpdate.emit(25)  # Update progress to 25%
+        #print("Called 1")
+        self.setWindowTitle("Progress")
+        self.progress_bar = QProgressBar()
+        layout = QVBoxLayout()
+        layout.addWidget(self.progress_bar)
+        self.setLayout(layout)
+        self.setWindowModality(Qt.ApplicationModal)
+        self.setMaximumSize(300, 100)
+
+    def set_progress(self, value):
+        #print("Entered set progress")
+        self.progress_bar.setValue(value)
+
 class ListBoxWidget(QListWidget):
     dropEventSignal = QtCore.pyqtSignal() # Custom signal
     def __init__(self, parent=None):   
+        #print("Called 2")
         super().__init__(parent)
         self.setAcceptDrops(True)
         self.resize(600, 300)
@@ -52,30 +75,34 @@ class ListBoxWidget(QListWidget):
 
             links = []
             for url in event.mimeData().urls():
-                # https://doc.qt.io/qt-5/qurl.html
                 if url.isLocalFile():
-                    x = (str(url.toLocalFile()))
-                    links.append(str(url.toLocalFile()))
+                    file_path = str(url.toLocalFile())
+                    links.append(file_path)
                 else:
-                    x = (str(url.toString()))
-                    links.append(str(url.toString()))
-            self.addItems(links)
+                    file_path = str(url.toString())
+                    links.append(file_path)
 
-            x = x.replace('/', '\\')
-            print(x)
+            # Check if the files are already present in the list
+            existing_files = [self.item(index).text() for index in range(self.count())]
+            new_files = [file_path for file_path in links if file_path not in existing_files]
 
-            file_extension = os.path.splitext(x)[1]
+            self.addItems(new_files)
 
-            if file_extension == ".csv":
-                print("Source file is a .csv file.")
-            else:
-                print("Source file is not a .csv file.")
+            for file_path in new_files:
+                file_extension = os.path.splitext(file_path)[1]
 
-            process = QProcess(None)
-            command1 = "docker cp " + x + r" sparkcontainer:/app/datafiles"
-            print(command1)
-            process.start(command1)
-            process.waitForFinished()
+            #if file_extension == ".csv":
+            #    print("Source file is a .csv file.")
+            #else:
+            #    print("Source file is not a .csv file.")
+
+            #process = QProcess(None)
+            #process.finished.connect(process.deleteLater)  # Clean up the process
+            #process.setProcessChannelMode(QProcess.MergedChannels)  # Merge stdout and stderr
+
+            command1 = "docker cp " + file_path + r" sparkcontainer:/app/datafiles"
+            #print("*Ignore*",command1)
+            subprocess.run(command1, shell=True, check=True)
 
         else:
             event.ignore()
@@ -88,30 +115,39 @@ class ListBoxWidget(QListWidget):
             self.listbox.takeItem(self.listbox.row(item[0]))
 
 class ProcessThread(QThread):
+    
+
     new_output = pyqtSignal(str)
     error_occurred = pyqtSignal(str)
 
     def __init__(self, command):
         super().__init__()
         self.command = command
+        #print("Called 3")
 
     def run(self):
         try:
-            process = subprocess.Popen(self.command, stdout=subprocess.PIPE, stderr=subprocess.PIPE, shell=True)
-            while True:
-                output = process.stdout.readline().decode()
-                if not output:
-                    break
-                self.new_output.emit(output)
+            process = subprocess.Popen(
+            self.command,
+            stdout=subprocess.PIPE,
+            stderr=subprocess.PIPE,
+            shell=True,
+            universal_newlines=True  # Set universal_newlines to True to receive decoded output directly
+            )
+            stdout, _ = process.communicate()  # Use communicate to read both stdout and stderr
+            self.new_output.emit(stdout)  # Emit the output signal with the received output
         except Exception as e:
             self.error_occurred.emit(str(e))
 
 class DataCleaningThread(QThread):
+    
+
     progress_updated = pyqtSignal(int)
 
     def __init__(self, filename):
         super().__init__()
         self.filename = filename
+        #print("Called 4s")
 
     def run(self):
         command = self.filename
@@ -128,11 +164,10 @@ class DataCleaningThread(QThread):
 class startApp:
     def startContainer(self,stackedWidget):
         self.stackedWidget = stackedWidget
-        #self.stackedWidget.setCurrentIndex(5)
-        print("Start container")
+        #print("Start container")
         loadingpage = loadingPage(self.stackedWidget)
         self.stackedWidget.addWidget(loadingpage)
-        print("Going to starting page")
+        #print("Going to starting page")
         self.stackedWidget.setCurrentWidget(loadingpage)
         self.stackedWidget.show()
 
@@ -140,7 +175,7 @@ class startApp:
         self.stackedWidget = stackedWidget
         setuppage = FirstSetupPage(self.stackedWidget)
         self.stackedWidget.addWidget(setuppage)
-        print("Going to setup page")
+        #print("Going to setup page")
         self.stackedWidget.setCurrentWidget(setuppage)
         self.stackedWidget.show() 
     
@@ -156,16 +191,6 @@ class containerE:
             item.setData(2, c.status)
             item.setText(f"{c.name} - {c.status}")
             self.containerList.addItem(item)
-
-    def stopContainer(self, stackedWidget):
-        process = QProcess(None)
-        command = r'docker-compose -f .\docker-compose.yml stop'
-        process.start(command)
-        process.waitForFinished()
-        output = process.readAllStandardOutput().data().decode()
-        print(output)
-        print("Going to main page")
-        stackedWidget.setCurrentIndex(0)
     
     def checkContainers(self):
         self.docker_client = docker.from_env()
@@ -199,7 +224,7 @@ class containerE:
                 else:
                     return True
         else:
-            print("Not inside")
+            #print("Not inside")
             return False
         
     def containersPresent2(self):
@@ -223,9 +248,11 @@ class containerE:
 
 
 #For Historical data page
-class dataFiles:
+class dataFiles(QThread):
+    
     def refreshFiles(self,listview):
         #print("Listing files...")
+        #print("Did it come here? Yes")
         self.listview = listview
         self.listview.clear()  # Clear the listbox view
         container_id = "sparkcontainer" 
@@ -258,21 +285,24 @@ class dataFiles:
             #process data   
             item = self.listview.currentItem()
             full_path = item.text()
+
             # Extract filename from full path
             filename = os.path.basename(full_path)
             command5 = f'docker exec -it sparkcontainer spark-submit cleanHistoricalData.py hdfs://namenode:9000/data/' + filename
+
             if self.data_cleaning_thread is None:
                 self.progressBar.show()
-                self.data_cleaning_thread = DataCleaningThread("docker exec -it sparkcontainer spark-submit cleanHistoricalData.py /app/datafiles/historicalData_Australia_2023-03-01.csv")
+                self.data_cleaning_thread = DataCleaningThread(command5)
                 self.data_cleaning_thread.progress_updated.connect(self.progressBar.setValue)
                 self.data_cleaning_thread.finished.connect(lambda: data_cleaning_finished(self.data_cleaning_thread,self.progressBar))
                 self.data_cleaning_thread.start()
                 
             def data_cleaning_finished(data_cleaning_thread, progress_bar):
-                data_cleaning_thread = None
+                data_cleaning_thread.quit()
+                data_cleaning_thread.wait()
+                data_cleaning_thread.deleteLater()
                 progress_bar.hide()
-                messagebox.showinfo('Finished', 'Processing complete!')           
-          
+                messagebox.showinfo('Finished', 'Processing complete!')
         except Exception as e:
             # Show a message box with the error message if an exception occurs
             messagebox.showerror('Error', str(e))
@@ -293,7 +323,7 @@ class dataFiles:
             selected_item = self.listview.currentItem()
             if selected_item is not None:
                 file_path = selected_item.text()
-                print(file_path)
+                #print(file_path)
                 if file_path:
                     try:
                         self.listview.takeItem(self.listview.row(selected_item))  # Remove the item from the QListWidget
@@ -381,27 +411,11 @@ class dataFiles:
                     self.selectedcountry.clear()
                     print("Going to Historical Data page")
                     self.stackedWidget.setCurrentIndex(2)
-
-            #Ok will be disabled till process runs finish
-            #if confirm == QMessageBox.Yes:
-            #    confirm2 = QMessageBox.question(self, 'Processing', 'Retrieving...' ,
-            #                                QMessageBox.Ok)
-            #    dataFiles.getHist(self)
-            #    if confirm2 == QMessageBox.Ok:
-            #        self.stackedWidget.setCurrentIndex(2)
         except ValueError as e:
             QMessageBox.warning(self, 'Error', str(e))
 
     def getHist(self, listview):
-        #Get data from API to store in container's /app/data
-        #command1 = f'docker exec -it sparkcontainer python3 mainV2.py'
-        #output1 = subprocess.check_output(command1, shell=True)
-        #print(output1.decode())
 
-        #docker cp C:\Users\Owner\Desktop\FYP\Changes\FypApp\Spark\mainV2.py sparkcontainer:/app  
-        #docker cp C:\Users\Owner\Desktop\FYP\Changes\FypApp\Spark\processv2.py sparkcontainer:/app  
-        #docker cp C:\Users\Owner\Desktop\FYP\Changes\FypApp\Spark\combined_csv2.csv sparkcontainer:/app/data/
-        #docker cp namenode:/tmp/data/ C:\Users\Owner\Desktop 
         items = [self.selectedcountry.item(i).text() for i in range(self.selectedcountry.count())]
         locations = ' '.join(items)
         Date_is = self.startDateCal.date().toPyDate()
@@ -420,24 +434,26 @@ class dataFiles:
 
         dataFiles.trxHDFS(self, self.listview)
 
+    
+
     def trxHDFS(self, listview):
         self.listview = listview
         directory_path = r'.\hadoop_namenode'
         if os.path.exists(directory_path):
             shutil.rmtree(directory_path)
         else:
-            print(f"Directory '{directory_path}' does not exist.")
-
+            print(f"*Yes Ignore* Directory '{directory_path}' does not exist.")
+        
         command2 = f'docker cp sparkcontainer:/app/datafiles hadoop_namenode/'
         output2 = subprocess.check_output(command2, shell=True)
         print(output2.decode())
-        print("Tranferring to volume")
-
+        #print("Tranferring to volume")
+        
         command3 = f'docker cp hadoop_namenode/ namenode:/tmp'
         output3 = subprocess.check_output(command3, shell=True)
         print(output3.decode())
-        print("transferring to namenode")
-
+        #print("transferring to namenode")
+        
        
         command35 = 'docker exec -it namenode hdfs dfs -test -d /data'
         output35 = subprocess.run(command35, shell=True, capture_output=True, text=True)
@@ -445,19 +461,20 @@ class dataFiles:
             # Remove all files in the /data directory in HDFS
             command36 = 'docker exec -it namenode hdfs dfs -rm /data/*'
             subprocess.run(command36, shell=True, check=True)
-                        
+                            
             # Remove the /data directory in HDFS
             command37 = 'docker exec -it namenode hdfs dfs -rmdir /data'
             subprocess.run(command37, shell=True, check=True)
+            
         else:
-            print('/data does not exist in HDFS')
+            print('*Ignore*/data does not exist in HDFS')
 
 
         command4 = f'docker exec -it namenode hdfs dfs -put /tmp/hadoop_namenode /data'
         output4 = subprocess.check_output(command4, shell=True)
-        print(output4.decode())
-        print("transferring to hdfs")
-
+        #print(output4.decode())
+       #print("transferring to hdfs")
+        
         dataFiles.refreshFiles(self, self.listview)
 
 class streamLit:
@@ -509,7 +526,7 @@ class stream:
                 confirm = QMessageBox.question(self, 'Start Stream', message ,
                                                 QMessageBox.Yes | QMessageBox.No)
                 if confirm == QMessageBox.Yes:
-                    command1 = f"docker exec -d sparkcontainer python3 /app/data/test.py {locations}"
+                    command1 = f"docker exec -d sparkcontainer python3 /app/data/dataRT.py {locations}"
                     subprocess.run(command1, shell=True, check=True)
                     print("Stream1 started successfully.")
 
@@ -524,7 +541,6 @@ class stream:
 
                     command4 = f'docker exec -it sparkcontainer python3 /app/bin/sendStream.py /app/data.csv my-stream'
                     self.process_thread = ProcessThread(command4)
-                    #self.process_thread.new_output.connect(self.update_output)
                     self.process_thread.start()
                     print("Stream3 started successfully.")
 
@@ -555,7 +571,7 @@ class stream:
     def stopStream(self, streamLabel):
         self.streamLabel = streamLabel
         commands = [
-        "docker exec sparkcontainer pgrep -f /app/data/test.py",
+        "docker exec sparkcontainer pgrep -f /app/data/dataRT.py",
         "docker exec sparkcontainer pgrep -f /app/bin/processStream.py",
         "docker exec sparkcontainer pgrep -f /app/bin/sendStream.py"
         ]
@@ -718,17 +734,17 @@ class countries:
 class interface:
     def goTo0(self, stackwidget):
         self.stackedwidget = stackwidget
-        print("back button pressed")
+        #print("back button pressed")
         self.stackedwidget.setCurrentIndex(0)
     
     def goTo1(self, stackwidget):
         self.stackedwidget = stackwidget
-        print("back button pressed")
+        #print("back button pressed")
         self.stackedwidget.setCurrentIndex(1)
 
     def goTo2(self, stackwidget):
         self.stackedwidget = stackwidget
-        print("back button pressed")
+        #print("back button pressed")
         self.stackedwidget.setCurrentIndex(2)
 
 #====================================CONTROLLERS=======================================
@@ -744,10 +760,6 @@ class startPageController:
 class containerStatusController:
     def containerStatusC(self, containerList):
         containerE.refreshContainer(self,containerList)
-
-class stopContainerController:
-    def stopContainerC(self, stackedWidget):
-        containerE.stopContainer(self,stackedWidget)
 
 class refreshHistController:
     def refreshHistC(self,listview):
@@ -912,12 +924,7 @@ class Page1(QWidget):
         self.pushButton13.setFixedSize(250, 90)
         self.pushButton13.setFont(font)
         self.pushButton13.setObjectName("pushButton213")
-        
-        #stop containers button
-        self.pushButton15 = QtWidgets.QPushButton("Stop Containers")
-        self.pushButton15.setFixedSize(250, 90)
-        self.pushButton15.setFont(font)
-        self.pushButton15.setObjectName("pushButton15")
+    
 
         self.container_list = QListWidget()
         #self.refreshContainerList()
@@ -936,13 +943,12 @@ class Page1(QWidget):
         layout1.addWidget(self.pushButton12, 1, 5) # Add the button to the grid layout1 at row 0, column 1
         layout1.addWidget(self.pushButton13, 1, 6) # Add the button to the grid layout1 at row 0, column 2
         #layout1.addWidget(self.pushButton14, 1, 0) # Add the button to the grid layout1 at row 1, column 0
-        layout1.addWidget(self.pushButton15, 2, 5) # Add the button to the grid layout1 at row 1, column 1
+
 
         # add button functionality for page 1
         self.pushButton11.clicked.connect(self.goBack)
         self.pushButton12.clicked.connect(self.analyseHist)
         self.pushButton13.clicked.connect(self.analyseRT)
-        self.pushButton15.clicked.connect(self.stopContainer)
         #self.container_list.itemSelectionChanged.connect(self.containerSelectionChanged)
         #add layout1 to page1
         self.setLayout(layout1)
@@ -953,19 +959,16 @@ class Page1(QWidget):
 
     #Goes to RT page
     def analyseRT(self):
-        print("Going to view RT data page 3")
+        #print("Going to view RT data page 3")
         self.stackedWidget.setCurrentIndex(3)
     
     def analyseHist(self):
         #goes to page 3 to view hist data
-        print("Going to view historical data")
+        #print("Going to view historical data")
         self.stackedWidget.setCurrentIndex(2)
 
     def containerStatus(self, containerList):
         containerStatusController.containerStatusC(self,containerList)
-
-    def stopContainer(self):
-        stopContainerController.stopContainerC(self,self.stackedWidget)
 
     def closeEvent(self):
         super().closeEvent()
@@ -974,6 +977,8 @@ class Page1(QWidget):
 class Page2(QWidget):
     def __init__(self,stackedWidget):
         super().__init__()
+        self.trx_hdfs_thread = None
+        self.progress_dialog = None
         self.stackedWidget = stackedWidget
 
         font = QtGui.QFont()
@@ -990,7 +995,7 @@ class Page2(QWidget):
 
         self.listview = ListBoxWidget(self)
         self.refreshHist()
-        #self.listview.dropEventSignal.connect(self.trxHDFS) # Connect the signal to a slot
+        self.listview.dropEventSignal.connect(self.trx2HDFS) # Connect the signal to a slot
         self.pushButton22= QPushButton("Get Data")
         self.pushButton22.setFixedSize(100,50)
         self.pushButton22.setFont(font)
@@ -1060,7 +1065,7 @@ class Page2(QWidget):
         backButtonController.backButtonC(self, self.stackedWidget, 1)
 
     def getdData(self):
-        print("Going to get Data in historical")
+        #print("Going to get Data in historical")
         self.stackedWidget.setCurrentIndex(4)
         self.refreshHist()
 
@@ -1085,6 +1090,23 @@ class Page2(QWidget):
     def getListView(self):
         listView = self.listview
         return listView
+    
+    def trx2HDFS(self):
+        #print("Trxhdfs 2 function")
+        self.progress_dialog = ProgressDialog()
+        self.progress_dialog.show()
+        
+        self.trx_hdfs_thread = dataFiles2()
+        self.trx_hdfs_thread.progressUpdate.connect(self.progress_dialog.set_progress)
+        
+        self.trx_hdfs_thread.finished.connect(self.progress_dialog.close)
+        self.trx_hdfs_thread.finished.connect(self.refreshHist)
+        
+        self.trx_hdfs_thread.finished.connect(self.trx_hdfs_thread.deleteLater)  # Clean up the thread
+       
+        self.trx_hdfs_thread.start()
+        
+
               
 #Boundary for Real Time Data UI (Page 3)
 class Page3(QWidget):
@@ -1307,7 +1329,7 @@ class getData(Page3):
 #Boundary for loading page (page5)
 class loadingPage(QWidget):
     def __init__(self, stackedWidget):
-        print("Entering loading page")
+        #print("Entering loading page")
         super().__init__()
         self.stackedWidget = stackedWidget
 
@@ -1370,9 +1392,9 @@ class loadingPage(QWidget):
         current_widget_index = self.stackedWidget.currentIndex()
         current_widget = self.stackedWidget.widget(current_widget_index)
         self.stackedWidget.removeWidget(current_widget)
-        print("Processed finished, going to page 1")
+        #print("Processed finished, going to page 1")
         self.stackedWidget.setCurrentIndex(1)
-        print("Processed finished")
+        #print("Processed finished")
 
     def timerFinished(self):
         self.timer2.stop()
@@ -1381,7 +1403,7 @@ class loadingPage(QWidget):
         current_widget_index = self.stackedWidget.currentIndex()
         current_widget = self.stackedWidget.widget(current_widget_index)
         self.stackedWidget.removeWidget(current_widget)
-        print("Timer finished, going to page 1")
+        #print("Timer finished, going to page 1")
         self.stackedWidget.setCurrentIndex(1)
         # Do something when timer finished
         #print("Timer finished")
@@ -1435,7 +1457,7 @@ class FirstSetupPage(QWidget):
             current_widget_index = self.stackedWidget.currentIndex()
             current_widget = self.stackedWidget.widget(current_widget_index)
             self.stackedWidget.removeWidget(current_widget)
-            print("Container is present, going to page 1")
+            #print("Container is present, going to page 1")
             self.stackedWidget.setCurrentIndex(1)
     def closeEvent(self):
         super().closeEvent()
@@ -1494,7 +1516,7 @@ class MainWindow(QMainWindow):
             process.waitForFinished()
 
             output = process.readAllStandardOutput().data().decode()
-            print(output)
+            #print(output)
 
             event.accept()
         else:
@@ -1509,6 +1531,9 @@ if __name__ == '__main__':
     app.exec_()
 
 
-
+#remove stop
+#solve issue of importing csv files
+#Check the exit that all containers stop
+#Clear comments
 
 
